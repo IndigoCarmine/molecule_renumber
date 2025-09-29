@@ -1,0 +1,52 @@
+REMARK LIGPARGEN GENERATED PDB FILE
+ATOM      1 C00  ENA     1       1.000   1.000   0.000  0.00  0.00              
+ATOM      2 C01  ENA     1      -0.521   1.000   0.000  0.00  0.00              
+ATOM      3 C02  ENA     1      -1.101   1.000   1.399  0.00  0.00              
+ATOM      4 C03  ENA     1      -1.365  -0.249   1.991  0.00  0.00              
+ATOM      5 C04  ENA     1      -1.948  -0.333   3.250  0.00  0.00              
+ATOM      6 C05  ENA     1      -2.277   0.831   3.938  0.00  0.00              
+ATOM      7 C06  ENA     1      -2.027   2.093   3.377  0.00  0.00              
+ATOM      8 C07  ENA     1      -2.367   3.254   4.092  0.00  0.00              
+ATOM      9 C08  ENA     1      -2.129   4.519   3.559  0.00  0.00              
+ATOM     10 C09  ENA     1      -1.548   4.636   2.304  0.00  0.00              
+ATOM     11 C0A  ENA     1      -1.207   3.487   1.584  0.00  0.00              
+ATOM     12 C0B  ENA     1      -1.384   2.197   2.118  0.00  0.00              
+ATOM     13 H0C  ENA     1       1.375   0.999  -1.029  0.00  0.00              
+ATOM     14 H0D  ENA     1       1.395   0.111   0.504  0.00  0.00              
+ATOM     15 H0E  ENA     1       1.402   1.884   0.506  0.00  0.00              
+ATOM     16 H0F  ENA     1      -0.879   0.114  -0.540  0.00  0.00              
+ATOM     17 H0G  ENA     1      -0.901   1.851  -0.575  0.00  0.00              
+ATOM     18 H0H  ENA     1      -1.114  -1.167   1.464  0.00  0.00              
+ATOM     19 H0I  ENA     1      -2.147  -1.304   3.694  0.00  0.00              
+ATOM     20 H0J  ENA     1      -2.731   0.744   4.922  0.00  0.00              
+ATOM     21 H0K  ENA     1      -2.822   3.178   5.077  0.00  0.00              
+ATOM     22 H0M  ENA     1      -2.397   5.406   4.125  0.00  0.00              
+ATOM     23 H0N  ENA     1      -1.361   5.619   1.880  0.00  0.00              
+ATOM     24 H0O  ENA     1      -0.794   3.625   0.589  0.00  0.00              
+TER 
+CONECT    1    2               
+CONECT    2    3               
+CONECT    3    4               
+CONECT    4    5               
+CONECT    5    6               
+CONECT    6    7               
+CONECT    7    8               
+CONECT    8    9               
+CONECT    9   10               
+CONECT   10   11               
+CONECT    3   12               
+CONECT    1   13               
+CONECT    1   14               
+CONECT    1   15               
+CONECT    2   16               
+CONECT    2   17               
+CONECT    4   18               
+CONECT    5   19               
+CONECT    6   20               
+CONECT    8   21               
+CONECT    9   22               
+CONECT   10   23               
+CONECT   11   24               
+CONECT    7   12               
+CONECT   11   12               
+END

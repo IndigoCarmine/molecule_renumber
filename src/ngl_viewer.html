@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NGL Viewer (embedded)</title>
+  <script src="./ngl.js"></script>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    #viewport { width: 100%; height: 100%; background: #222; }
+    #overlay { position:absolute; left:10px; top:10px; color:#fff; z-index:10; }
+  </style>
+</head>
+<body>
+  <div id="viewport"></div>
+  <div id="overlay">Click an atom to select</div>
+
+  <script>
+    let stage = new NGL.Stage("viewport", { backgroundColor: "black" });
+
+    // resize handling
+    window.addEventListener("resize", function() { stage.handleResize(); }, false);
+
+    // WebChannel bridge
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+      window.bridge = channel.objects.bridge;
+    });
+
+    // keep current component reference
+    let currentComponent = null;
+
+    // load PDB text from Python by calling this function
+    function loadPDBFromText(pdbText) {
+      // Remove previous comp if any
+      if (currentComponent) {
+        try { currentComponent.removeAllRepresentations(); currentComponent.remove(); } catch(e) {}
+        currentComponent = null;
+      }
+      // Create Blob to load as file
+      const blob = new Blob([pdbText], { type: 'text/plain' });
+      stage.loadFile(blob, { ext: "pdb" }).then(function(o) {
+        currentComponent = o;
+        o.addRepresentation("ball+stick", { sele: "not polymer" , colorScheme: "resname" });
+
+      }).catch(function(err){
+        console.error("NGL load error:", err);
+      });
+    }
+
+    // picking: on click, use stage.pick
+    stage.signals.clicked.add(function(pickData){
+    // pickData は { picked: true/false, atom: NGL.AtomProxy, ... } 
+    if (!pickData || !pickData.atom) return;
+
+    let atom = pickData.atom;
+
+    const info = {
+        type: "pick",
+        chain: atom.chainname,
+        resno: atom.resno,
+        resname: atom.resname,
+        atomname: atom.atomname,
+        serial: atom.serial
+    };
+
+    // Python へ送信
+    if (window.bridge && window.bridge.fromJs) {
+        window.bridge.fromJs(JSON.stringify(info));
+    }
+
+    // ハイライト表示
+    if (currentComponent) {
+        currentComponent.removeRepresentationByName("selectionHighlight");
+        const sel = `/${info.chain}//${info.resno}/${info.atomname}`;
+        currentComponent.addRepresentation("spacefill", { sele: sel, scale: 0.6, name: "selectionHighlight" });
+    }
+
+    });
+
+    // expose function to global for Python to call
+    // window.loadPDBFromText = function(pdbText) {
+    //   // store last for simple reload in selection visual feedback
+    //   window._last_pdb_text = pdbText;
+    //   loadPDBFromText(pdbText);
+    // };
+    bridge.sendMessage.connect( function(pdbText) {
+      // store last for simple reload in selection visual feedback
+      window._last_pdb_text = pdbText;
+      loadPDBFromText(pdbText);
+    });
+
+// Helper: スクリーン座標判定
+function atomInBox(atom, x1, y1, x2, y2) {
+    const pos = stage.viewer.camera.project(atom.position);
+    const sx = (pos.x * 0.5 + 0.5) * stage.viewer.width;
+    const sy = (-pos.y * 0.5 + 0.5) * stage.viewer.height;
+    return sx >= x1 && sx <= x2 && sy >= y1 && sy <= y2;
+}
+    stage.mouseControls.orbit.enabled = false;
+    stage.mouseControls.pan.enabled = false;
+    stage.mouseControls.zoom.enabled = false;
+// Drag 範囲選択
+viewport.addEventListener("mousedown", (e)=>{
+    if (!e.shiftKey || e.button!==0) return; // Shift+左ドラッグ専用
+    e.preventDefault();
+    e.stopPropagation();
+
+    selecting = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    boxDiv.style.left = `${startX}px`;
+    boxDiv.style.top = `${startY}px`;
+    boxDiv.style.width = "0px";
+    boxDiv.style.height = "0px";
+
+    // 一時的に回転/パン/ズームを無効化
+    stage.mouseControls.orbit.enabled = false;
+    stage.mouseControls.pan.enabled = false;
+    stage.mouseControls.zoom.enabled = false;
+});
+
+viewport.addEventListener("mousemove", (e)=>{
+    if (!selecting) return;
+    const x = Math.min(e.clientX, startX);
+    const y = Math.min(e.clientY, startY);
+    const w = Math.abs(e.clientX - startX);
+    const h = Math.abs(e.clientY - startY);
+    boxDiv.style.left = `${x}px`;
+    boxDiv.style.top = `${y}px`;
+    boxDiv.style.width = `${w}px`;
+    boxDiv.style.height = `${h}px`;
+});
+
+viewport.addEventListener("mouseup", (e)=>{
+    if (!selecting) return;
+    selecting = false;
+    boxDiv.style.width = "0px";
+    boxDiv.style.height = "0px";
+
+    const x1 = Math.min(startX, e.clientX);
+    const y1 = Math.min(startY, e.clientY);
+    const x2 = Math.max(startX, e.clientX);
+    const y2 = Math.max(startY, e.clientY);
+
+    selectedAtoms = [];
+    if (currentComponent) {
+        currentComponent.structure.eachAtom(atom=>{
+            if (atomInBox(atom, x1, y1, x2, y2)) {
+                selectedAtoms.push({
+                    serial: atom.get_serial_number(),
+                    chain: atom.chainname,
+                    resno: atom.resno,
+                    atomname: atom.atomname,
+                    resname: atom.resname
+                });
+            }
+        });
+    }
+
+    console.log("Selected atoms:", selectedAtoms);
+
+    // Python 側へ送信（QWebChannel 接続済みの場合）
+    if (window.bridge && window.bridge.fromJs) {
+        window.bridge.fromJs(JSON.stringify({type:"drag_select", atoms:selectedAtoms}));
+    }
+
+    // 元に戻す
+    stage.mouseControls.orbit.enabled = true;
+    stage.mouseControls.pan.enabled = true;
+    stage.mouseControls.zoom.enabled = true;
+});
+
+  </script>
+</body>
+</html>

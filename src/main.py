@@ -26,6 +26,16 @@ import re
 from pdb_file import AdhocPDB, AtomRecord
 
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS  # type: ignore
+    except Exception:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
+
 class Bridge(QObject):
     # signal from python to JS (not strictly required here)
     sendMessage = pyqtSignal(str)
@@ -53,7 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # WebEngineView for NGL
         self.view = QtWebEngineWidgets.QWebEngineView()
-        html_path = os.path.join(os.path.dirname(__file__), "ngl_viewer.html")
+        html_path = get_resource_path("ngl_viewer.html")
         print("Loading HTML from", html_path)
         self.view.load(QtCore.QUrl.fromLocalFile(html_path))
         hbox.addWidget(self.view, 3)
@@ -78,6 +88,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected_list = QtWidgets.QListWidget()
         ctrl_layout.addWidget(QtWidgets.QLabel("Selected atoms:"))
         ctrl_layout.addWidget(self.selected_list)
+
+        self.select_between_btn = QtWidgets.QPushButton("Select atoms between (2 atoms)")
+        self.select_between_btn.setEnabled(False)
+        self.select_between_btn.clicked.connect(self.select_atoms_between)
+        ctrl_layout.addWidget(self.select_between_btn)
 
         edit_btn = QtWidgets.QPushButton("Change selected residues' resname...")
         edit_btn.clicked.connect(self.edit_resnames)
@@ -107,6 +122,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # selected atoms: list of dicts with keys {chain, resno, atomname, serial}
         self.selected_atoms = []
 
+    def update_button_state(self):
+        self.select_between_btn.setEnabled(len(self.selected_atoms) == 2)
+
     def open_pdb(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open PDB file", ".", "PDB Files (*.pdb *.ent *.cif);;All Files (*)"
@@ -128,6 +146,33 @@ class MainWindow(QtWidgets.QMainWindow):
         # clear selection
         self.selected_atoms.clear()
         self.selected_list.clear()
+        self.update_button_state()
+        self.update_ngl_selection()
+
+    def update_ngl_selection(self):
+        import json
+        
+        if not self.selected_atoms:
+            # clear highlight - send empty serials array
+            data = {"serials": []}
+            safe_js = f"highlightAtoms({json.dumps(data)})"
+            self.view.page().runJavaScript(safe_js)
+            return
+
+        # collect serial numbers
+        serials = [a.serial for a in self.selected_atoms]
+        if not serials:
+            data = {"serials": []}
+            safe_js = f"highlightAtoms({json.dumps(data)})"
+            self.view.page().runJavaScript(safe_js)
+            return
+
+        # Send JSON data to JavaScript
+        data = {"serials": serials}
+        
+        print(f"Updating NGL selection with serials: {serials}")
+        safe_js = f"highlightAtoms({json.dumps(data)})"
+        self.view.page().runJavaScript(safe_js)
 
     @pyqtSlot(str)
     def on_js_message(self, msg):
@@ -140,10 +185,17 @@ class MainWindow(QtWidgets.QMainWindow):
             print("Invalid msg from JS:", msg, e)
             return
 
-        print("Message from JS:", data)
-
-        # Example expected data: {"type":"pick","chain":"A","resno":45,"resname":"GLY","atomname":"CA","serial":123}
-        if data.get("type") == "pick":
+        # Handle different message types from JavaScript
+        msg_type = data.get("type")
+        
+        if msg_type == "log":
+            # Log message from JavaScript
+            log_msg = data.get("message", "")
+            log_data = data.get("data", {})
+            print(f"[JS Log] {log_msg}", log_data if log_data else "")
+            return
+        
+        if msg_type == "pick":
             entry = {
                 "chain": data.get("chain"),
                 "resno": int(data.get("resno"))
@@ -171,13 +223,72 @@ class MainWindow(QtWidgets.QMainWindow):
                 h = self.parser.find_connected_hydrogen(atom)
                 atoms.extend(h)
 
-            for a in atoms:
-                if a in self.selected_atoms:
-                    continue
+            # Check if the clicked atom is already selected
+            # If so, we toggle OFF (remove) all related atoms (clicked + hydrogens)
+            # If not, we toggle ON (add) them
+            
+            # We determine "already selected" by checking if the *primary clicked atom* is in the list.
+            # (Alternatively, we could check if *any* of the atoms are in the list, but checking the clicked one is more intuitive for "toggle")
+            is_toggle_off = (atom in self.selected_atoms)
+
+            if is_toggle_off:
+                # Remove atoms
+                for a in atoms:
+                    if a in self.selected_atoms:
+                        # Remove from internal list
+                        self.selected_atoms.remove(a)
+                        
+                        # Remove from UI list
+                        # We need to find the matching QListWidgetItem
+                        # The text format is: f"{a.serial} {a.name} {a.resName}{a.resSeq}{a.iCode} chain {a.chainID}"
+                        # It's safer/easier to just rebuild the list or search by text. 
+                        # Given the list size is likely small, rebuilding might be okay, but let's try to find and remove.
+                        search_text = f"{a.serial} {a.name} {a.resName}{a.resSeq}{a.iCode} chain {a.chainID}"
+                        items = self.selected_list.findItems(search_text, QtCore.Qt.MatchFlag.MatchExactly)
+                        for item in items:
+                            row = self.selected_list.row(item)
+                            self.selected_list.takeItem(row)
+            else:
+                # Add atoms
+                for a in atoms:
+                    if a in self.selected_atoms:
+                        continue
+                    self.selected_atoms.append(a)
+                    self.selected_list.addItem(
+                        f"{a.serial} {a.name} {a.resName}{a.resSeq}{a.iCode} chain {a.chainID}"
+                    )
+            
+            self.update_button_state()
+            self.update_ngl_selection()
+
+    def select_atoms_between(self):
+        if len(self.selected_atoms) != 2:
+            return
+        
+        atom1 = self.selected_atoms[0]
+        atom2 = self.selected_atoms[1]
+        
+        path_atoms = self.parser.find_atoms_between(atom1, atom2)
+        
+        # If "Select with connected hydrogens" is checked, add hydrogens for path atoms
+        final_atoms = list(path_atoms)
+        if self.with_hbond_chk.isChecked():
+            for atom in path_atoms:
+                hydrogens = self.parser.find_connected_hydrogen(atom)
+                for h in hydrogens:
+                    if h not in final_atoms:
+                        final_atoms.append(h)
+
+        # Add new atoms to selection
+        for a in final_atoms:
+            if a not in self.selected_atoms:
                 self.selected_atoms.append(a)
                 self.selected_list.addItem(
                     f"{a.serial} {a.name} {a.resName}{a.resSeq}{a.iCode} chain {a.chainID}"
                 )
+        
+        self.update_button_state()
+        self.update_ngl_selection()
 
     def edit_resnames(self):
         if not self.selected_atoms:
@@ -217,6 +328,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # clear selection
         self.selected_atoms.clear()
         self.selected_list.clear()
+        self.update_button_state()
+        self.update_ngl_selection()
 
     def export_pdb(self):
         if self.current_pdb_text is None:

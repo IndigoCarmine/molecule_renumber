@@ -12,4 +12,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyinstaller>=6.16.0",
+    "taskipy>=1.12.0",
 ]
+
+[tool.taskipy.tasks]
+pre_build = "npx tsc"
+build = "pyinstaller src/main.py --name molecule-renumber --onefile --windowed --add-data \"src/ngl_viewer.html;.\" --add-data \"src/ngl.js;.\" --add-data \"src/ngl_viewer.js;.\" --clean --noconfirm"

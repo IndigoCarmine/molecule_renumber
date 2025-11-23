@@ -219,16 +219,92 @@ class AdhocPDB:
         """
         指定した原子に結合している水素原子を探す。
         """
-        connected_atoms = []
+        connected_serials = set()
+        target_serial = atom.serial
+
         for conect in self.get_conects():
-            if atom.serial in conect.bonded:
-                connected_atoms.extend(conect.bonded)
+            # Case 1: The record is for the target atom (serial matches)
+            if conect.serial == target_serial:
+                connected_serials.update(conect.bonded)
+            
+            # Case 2: The target atom is in the bonded list of another atom
+            elif target_serial in conect.bonded:
+                connected_serials.add(conect.serial)
+
         hydrogens = []
-        for serial in connected_atoms:
-            for a in self.get_atoms():
-                if a.serial == serial and "H" in a.name:
-                    hydrogens.append(a)
+        for a in self.get_atoms():
+            if a.serial in connected_serials and "H" in a.name:
+                hydrogens.append(a)
         return hydrogens
+
+    def find_atoms_between(self, atom1: AtomRecord, atom2: AtomRecord) -> list[AtomRecord]:
+        """
+        2つの原子(atom1, atom2)をつなぐすべての単純経路(ループなし)上の原子を返す。
+        """
+        if atom1.serial == atom2.serial:
+            return [atom1]
+
+        # 1. Build Adjacency Map
+        # serial -> set of connected serials
+        adj: dict[int, set[int]] = {}
+
+        # Initialize for all atoms to ensure keys exist (optional but good for safety)
+        # However, we only care about atoms involved in connections.
+        
+        for conect in self.get_conects():
+            src = conect.serial
+            if src not in adj:
+                adj[src] = set()
+            
+            for dst in conect.bonded:
+                adj[src].add(dst)
+                # Ensure symmetry
+                if dst not in adj:
+                    adj[dst] = set()
+                adj[dst].add(src)
+
+        # 2. DFS to find all simple paths
+        # paths: list of list of serials
+        all_paths_atoms: set[int] = set()
+        
+        # stack for DFS: (current_serial, visited_path_set, current_path_list)
+        # visited_path_set is for O(1) lookup to prevent cycles in current path
+        start_node = atom1.serial
+        end_node = atom2.serial
+        
+        # Using iterative DFS to avoid recursion limit issues, though recursive is easier to write.
+        # Given "all paths", recursive is often cleaner. Let's use recursive with a helper.
+        
+        def dfs(current: int, target: int, visited: set[int], path: list[int]):
+            if current == target:
+                # Found a path
+                all_paths_atoms.update(path)
+                return
+
+            if current not in adj:
+                return
+
+            for neighbor in adj[current]:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    path.append(neighbor)
+                    dfs(neighbor, target, visited, path)
+                    path.pop()
+                    visited.remove(neighbor)
+
+        # Start DFS
+        dfs(start_node, end_node, {start_node}, [start_node])
+
+        # 3. Retrieve AtomRecords
+        result_atoms = []
+        # Optimization: create a map of serial -> AtomRecord
+        atom_map = {a.serial: a for a in self.get_atoms()}
+        
+        for serial in all_paths_atoms:
+            if serial in atom_map:
+                result_atoms.append(atom_map[serial])
+        
+        return result_atoms
 
 
 def print_diff(original: str, dumped: str):

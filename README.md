@@ -1,28 +1,29 @@
 # Molecule Renumber
 
-分子構造ビューアーと原子番号の再割り当てツール
+分子構造ビューアーおよび原子番号再割り当てツール。
+Blender の MolecularNodes で `res_id` に基づく着色を行う用途に最適化しています。
 
-## 開発環境のセットアップ
+## 開発環境
 
-### 必要な環境
+### 必要要件
 
-- Python 3.x
-- Node.js (TypeScriptコンパイル用)
-- uv (Pythonパッケージマネージャー)
+* Python 3.x
+* Node.js（TypeScript コンパイル用）
+* uv（Python パッケージマネージャー）
 
 ### インストール
 
 ```bash
-# Pythonの依存関係をインストール
+# Python の依存関係
 uv sync
 
-# TypeScriptコンパイラをインストール
+# TypeScript コンパイラ
 npm install --save-dev typescript
 ```
 
-## TypeScriptのコンパイル
+## TypeScript コンパイル
 
-NGL Viewerのコードは TypeScript で記述されています。変更を加えた場合は、以下のコマンドでコンパイルしてください。
+NGL Viewer 関連コードは TypeScript で記述されています。編集後は以下の方法でコンパイルしてください。
 
 ### 手動コンパイル
 
@@ -30,48 +31,46 @@ NGL Viewerのコードは TypeScript で記述されています。変更を加�
 npx tsc
 ```
 
-このコマンドは `src/ngl_viewer.ts` を `src/ngl_viewer.js` にコンパイルします。
+`src/ngl_viewer.ts` が `src/ngl_viewer.js` に変換されます。
+`uv run task build` 実行時には TypeScript コンパイルも自動的に行われます。
 
-**注意**: `uv run task build` を実行すると、TypeScriptのコンパイルは自動的に実行されます。
+### ウォッチモード
 
-### 自動コンパイル（ウォッチモード）
-
-開発中は、ファイルの変更を監視して自動的にコンパイルするウォッチモードが便利です：
+開発中は自動コンパイルが便利です。
 
 ```bash
 npx tsc --watch
 ```
 
-### TypeScript設定
+### TypeScript 設定
 
-TypeScriptの設定は `tsconfig.json` で管理されています：
+設定は `tsconfig.json` に定義されています。
 
-- **ターゲット**: ES2017
-- **モジュール**: ES2015
-- **出力先**: `./src`
-- **厳格な型チェック**: 有効
+* Target: ES2017
+* Module: ES2015
+* Output: `./src`
+* Strict モード: 有効
 
-## アプリケーションの実行
+## アプリケーション実行
 
 ```bash
-# Pythonアプリケーションを起動
 uv run python src/main.py
 ```
 
 ## ビルド
 
-実行可能ファイル（.exe）をビルドするには：
+実行可能ファイル（.exe）を生成する場合：
 
 ```bash
 uv run task build
 ```
 
-このコマンドは以下を自動的に実行します：
+この処理には以下が含まれます。
 
-1. TypeScriptのコンパイル（`npx tsc`）
-2. PyInstallerによる実行可能ファイルの作成
+1. TypeScript のコンパイル
+2. PyInstaller による実行ファイル生成
 
-ビルドされた実行可能ファイルは `dist/molecule-renumber.exe` に生成されます。
+ビルド済みファイルは `dist/molecule-renumber.exe` に配置されます。
 
 ## プロジェクト構成
 
@@ -79,20 +78,20 @@ uv run task build
 molecule_renumber/
 ├── src/
 │   ├── main.py              # メインアプリケーション
-│   ├── pdb_file.py          # PDBファイル処理
-│   ├── ngl_viewer.html      # NGL Viewerのテンプレート
-│   ├── ngl_viewer.ts        # NGL ViewerのTypeScriptコード
-│   ├── ngl_viewer.js        # コンパイル済みJavaScript（自動生成）
+│   ├── pdb_file.py          # PDB処理ロジック
+│   ├── ngl_viewer.html      # NGL Viewer テンプレート
+│   ├── ngl_viewer.ts        # TypeScript ソース
+│   ├── ngl_viewer.js        # コンパイル済み JavaScript（自動生成）
 │   └── ngl.js               # NGL ライブラリ
-├── tsconfig.json            # TypeScript設定
-├── pyproject.toml           # Python依存関係
-└── README.md                # このファイル
+├── tsconfig.json            # TypeScript 設定
+├── pyproject.toml           # Python 依存関係
+└── README.md
 ```
 
-## 開発ワークフロー
+## 開発フロー
 
-1. TypeScriptコードを編集: `src/ngl_viewer.ts`
-2. コンパイル: `npx tsc`
-3. アプリケーションを実行: `uv run python src/main.py`
+1. TypeScript を編集（`src/ngl_viewer.ts`）
+2. コンパイル（`npx tsc`）
+3. アプリケーション起動（`uv run python src/main.py`）
 
-**注意**: `src/ngl_viewer.js` は自動生成されるファイルなので、直接編集しないでください。
+`src/ngl_viewer.js` は自動生成ファイルのため、直接編集しないこと。

@@ -175,11 +175,21 @@ class AdhocPDB:
         with open(filepath, "r") as f:
             self.load(f.read())
 
+    def update_resseq(self):
+        resname_set = set([atom.resName for atom in self.get_atoms()])
+        for i, resname in enumerate(resname_set):
+            for atom in self.get_atoms():
+                if atom.resName == resname:
+                    atom.resSeq = i + 1
+        
+
     def dump(self) -> str:
         """
         現在の内容をPDBフォーマットのテキストに変換する。
         """
+        self.update_resseq()
         lines = []
+
         for entry in self.context:
             if isinstance(entry, AtomRecord):
                 lines.append(entry.to_line())

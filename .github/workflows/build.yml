@@ -45,12 +45,12 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: molecule-renumber-exe
-          path: dist/molecule-renumber.exe
+          name: Kuromame-exe
+          path: dist/Kuromame.exe
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/molecule-renumber.exe
+          files: dist/Kuromame.exe
           generate_release_notes: true

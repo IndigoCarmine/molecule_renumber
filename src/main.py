@@ -54,7 +54,7 @@ class Bridge(QObject):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NGL + PyQt6 PDB Editor (PoC)")
+        self.setWindowTitle("Kuromame")
         self.resize(1200, 800)
         self.setAcceptDrops(True)
 

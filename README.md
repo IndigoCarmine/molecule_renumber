@@ -1,4 +1,4 @@
-# Molecule Renumber
+# Kuromame
 
 分子構造ビューアーおよび原子番号再割り当てツール。
 Blender の MolecularNodes で `res_id` に基づく着色を行う用途に最適化しています。
@@ -70,7 +70,7 @@ uv run task build
 1. TypeScript のコンパイル
 2. PyInstaller による実行ファイル生成
 
-ビルド済みファイルは `dist/molecule-renumber.exe` に配置されます。
+ビルド済みファイルは `dist/Kuromame.exe` に配置されます。
 
 ## プロジェクト構成
 

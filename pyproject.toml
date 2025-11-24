@@ -1,6 +1,6 @@
 [project]
 name = "Kuromame"
-version = "1.0.2"
+version = "1.0.3"
 description = "A desktop application for renumbering molecules with 3D visualization."
 readme = "README.md"
 requires-python = ">=3.11.9"

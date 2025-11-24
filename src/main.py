@@ -24,6 +24,7 @@ from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject
 from io import StringIO
 import re
 from pdb_file import AdhocPDB, AtomRecord
+from mol2_file import Mol2File
 
 
 def get_resource_path(relative_path):
@@ -55,6 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("NGL + PyQt6 PDB Editor (PoC)")
         self.resize(1200, 800)
+        self.setAcceptDrops(True)
 
         # Central widget split: left = viewer, right = controls
         central = QtWidgets.QWidget()
@@ -63,6 +65,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # WebEngineView for NGL
         self.view = QtWebEngineWidgets.QWebEngineView()
+        self.view.setAcceptDrops(False)
         html_path = get_resource_path("ngl_viewer.html")
         print("Loading HTML from", html_path)
         self.view.load(QtCore.QUrl.fromLocalFile(html_path))
@@ -74,8 +77,8 @@ class MainWindow(QtWidgets.QMainWindow):
         hbox.addWidget(ctrl, 1)
 
         # Buttons and list
-        load_btn = QtWidgets.QPushButton("Open PDB")
-        load_btn.clicked.connect(self.open_pdb)
+        load_btn = QtWidgets.QPushButton("Open Molecule File (PDB/MOL2)")
+        load_btn.clicked.connect(self.open)
         ctrl_layout.addWidget(load_btn)
 
         self.pdb_label = QtWidgets.QLabel("No file loaded")
@@ -88,6 +91,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected_list = QtWidgets.QListWidget()
         ctrl_layout.addWidget(QtWidgets.QLabel("Selected atoms:"))
         ctrl_layout.addWidget(self.selected_list)
+
+        deselect_btn = QtWidgets.QPushButton("Clear Selection")
+        deselect_btn.clicked.connect(self.clear_selection)
+        ctrl_layout.addWidget(deselect_btn)
 
         self.select_between_btn = QtWidgets.QPushButton("Select atoms between (2 atoms)")
         self.select_between_btn.setEnabled(False)
@@ -123,14 +130,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected_atoms = []
 
     def update_button_state(self):
-        self.select_between_btn.setEnabled(len(self.selected_atoms) == 2)
+        without_h = [atom for atom in self.selected_atoms if "H" not in atom.name]
+        self.select_between_btn.setEnabled(len(without_h) == 2)
 
-    def open_pdb(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open PDB file", ".", "PDB Files (*.pdb *.ent *.cif);;All Files (*)"
-        )
-        if not path:
-            return
+    def clear_selection(self):
+        self.selected_atoms.clear()
+        self.selected_list.clear()
+        self.update_button_state()
+        self.update_ngl_selection()
+
+    def load_pdb_from_path(self, path):
         with open(path, "r") as f:
             pdb_text = f.read()
         self.current_pdb_text = pdb_text
@@ -144,10 +153,64 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view.page().runJavaScript(safe_js)
 
         # clear selection
-        self.selected_atoms.clear()
-        self.selected_list.clear()
-        self.update_button_state()
-        self.update_ngl_selection()
+        self.clear_selection()
+    
+    def load_mol2_from_path(self, path):
+        with open(path, "r") as f:
+            mol2_text = f.read()
+        
+        #convert mol2 to pdb
+        mol2 = Mol2File()
+        mol2.load(mol2_text)
+        pdb_text = mol2.to_pdb().dump()
+
+        self.parser.load(pdb_text)
+
+        # send pdb text to NGL (JS)
+        safe_js = f"loadPDBFromText({repr(pdb_text)})"
+        self.view.page().runJavaScript(safe_js)
+
+        # clear selection
+        self.clear_selection()  
+
+    def open(self):
+        #open pdb or mol2 file
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open supported file", "", "PDB Files (*.pdb *.ent *.cif);;MOL2 Files (*.mol2);;"
+        )
+        if not path:
+            return
+        
+        if path.endswith(".mol2"):
+            self.load_mol2_from_path(path)
+        elif path.endswith(".pdb") :
+            self.load_pdb_from_path(path)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if not urls:
+            return
+        
+        path = urls[0].toLocalFile()
+        if not path:
+            return
+
+        # Check extension
+        ext = os.path.splitext(path)[1].lower()
+        if ext in [".pdb"]:
+            self.load_pdb_from_path(path)
+        elif ext in [".mol2"]:
+            self.load_mol2_from_path(path)
+        else:
+            QtWidgets.QMessageBox.warning(
+                self, "Invalid File", "Dropped file is not a PDB/ENT/CIF file."
+            )
 
     def update_ngl_selection(self):
         import json
@@ -262,11 +325,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.update_ngl_selection()
 
     def select_atoms_between(self):
-        if len(self.selected_atoms) != 2:
+        without_h = [atom for atom in self.selected_atoms if "H" not in atom.name]
+        if len(without_h) != 2:
             return
         
-        atom1 = self.selected_atoms[0]
-        atom2 = self.selected_atoms[1]
+        atom1 = without_h[0]
+        atom2 = without_h[1]
         
         path_atoms = self.parser.find_atoms_between(atom1, atom2)
         
@@ -326,10 +390,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view.page().runJavaScript(safe_js)
 
         # clear selection
-        self.selected_atoms.clear()
-        self.selected_list.clear()
-        self.update_button_state()
-        self.update_ngl_selection()
+        self.clear_selection()
 
     def export_pdb(self):
         if self.current_pdb_text is None:

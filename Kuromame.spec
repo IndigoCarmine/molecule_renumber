@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='molecule-renumber',
+    name='Kuromame',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,7 +1,7 @@
 [project]
-name = "molecule-renumber"
-version = "0.2.0"
-description = "Add your description here"
+name = "Kuromame"
+version = "1.0.0"
+description = "A desktop application for renumbering molecules with 3D visualization."
 readme = "README.md"
 requires-python = ">=3.11.9"
 dependencies = [
@@ -17,4 +17,4 @@ dev = [
 
 [tool.taskipy.tasks]
 pre_build = "npx tsc"
-build = "pyinstaller src/main.py --name molecule-renumber --onefile --windowed --add-data \"src/ngl_viewer.html;.\" --add-data \"src/ngl.js;.\" --add-data \"src/ngl_viewer.js;.\" --clean --noconfirm"
+build = "pyinstaller src/main.py --name Kuromame --onefile --windowed --add-data \"src/ngl_viewer.html;.\" --add-data \"src/ngl.js;.\" --add-data \"src/ngl_viewer.js;.\" --clean --noconfirm"

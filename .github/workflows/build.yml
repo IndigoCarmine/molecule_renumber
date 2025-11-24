@@ -1,0 +1,56 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          uv sync --frozen
+          npm install
+
+      - name: Build Application
+        run: |
+          uv run task pre_build
+          uv run task build
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: molecule-renumber-exe
+          path: dist/molecule-renumber.exe
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/molecule-renumber.exe
+          generate_release_notes: true
